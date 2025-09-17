@@ -143,34 +143,68 @@ struct BookmarksView: View {
             Color.black.ignoresSafeArea()
             
             VStack {
-                // Простой заголовок
+                // Заголовок с статистикой
                 HStack {
-                    Text("Bookmarks")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Bookmarks")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                        
+                        Text("\(viewModel.getBookmarkedArticles().count) saved articles")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
                     Spacer()
+                    
+                    // Кнопка очистки закладок
+                    if viewModel.getBookmarkedArticles().count > 0 {
+                        Button("Clear All") {
+                            clearAllBookmarks()
+                        }
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    }
                 }
                 .padding()
                 
-                // Простой список
-                if viewModel.bookmarkedArticlesCount > 0 {
+                // Список закладок
+                if viewModel.getBookmarkedArticles().isEmpty {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image(systemName: "bookmark")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray)
+                        
+                        Text("No bookmarks yet")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        Text("Tap the bookmark icon on articles to save them here")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        
+                        Spacer()
+                    }
+                } else {
                     List {
-                        ForEach(Array(viewModel.getBookmarkedArticles().prefix(10)), id: \.id) { article in
-                            SimpleNewsRow(article: article) {
-                                viewModel.markAsRead(article)
-                            }
+                        ForEach(viewModel.getBookmarkedArticles(), id: \.id) { article in
+                            EnhancedNewsRow(article: article, viewModel: viewModel)
                         }
                     }
                     .listStyle(PlainListStyle())
                     .background(Color.black)
-                } else {
-                    Spacer()
-                    Text("No bookmarks yet")
-                        .foregroundColor(.gray)
-                    Spacer()
                 }
             }
+        }
+    }
+    
+    private func clearAllBookmarks() {
+        for article in viewModel.getBookmarkedArticles() {
+            viewModel.preferencesManager.unbookmarkArticle(article.id)
         }
     }
 }
@@ -189,34 +223,73 @@ struct LocalNewsView: View {
             Color.black.ignoresSafeArea()
             
             VStack {
-                // Простой заголовок
+                // Заголовок с локацией
                 HStack {
-                    Text("Local News")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                    Spacer()
-                }
-                .padding()
-                
-                // Простой список
-                List {
-                    ForEach(Array(viewModel.getLocalArticles().prefix(10)), id: \.id) { article in
-                        SimpleNewsRow(article: article) {
-                            viewModel.markAsRead(article)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Local News")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                        
+                        HStack {
+                            Image(systemName: "location.fill")
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                            
+                            Text(viewModel.locationService.currentAddress ?? "Location not available")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                         }
                     }
                     
-                    if viewModel.getLocalArticles().isEmpty {
-                        VStack {
-                            Text("No local news available")
-                                .foregroundColor(.gray)
-                                .padding()
-                        }
+                    Spacer()
+                    
+                    // Кнопка запроса локации
+                    Button {
+                        viewModel.locationService.requestLocationPermission()
+                    } label: {
+                        Image(systemName: "location.circle")
+                            .font(.title2)
+                            .foregroundColor(.red)
                     }
                 }
-                .listStyle(PlainListStyle())
-                .background(Color.black)
+                .padding()
+                
+                // Список локальных новостей
+                if viewModel.getLocalArticles().isEmpty {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image(systemName: "location.slash")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray)
+                        
+                        Text("No local news available")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        Text("Enable location services to get news from your area")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        
+                        Spacer()
+                    }
+                } else {
+                    List {
+                        ForEach(viewModel.getLocalArticles(), id: \.id) { article in
+                            HStack {
+                                Image(systemName: "location.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                
+                                EnhancedNewsRow(article: article, viewModel: viewModel)
+                            }
+                        }
+                    }
+                    .listStyle(PlainListStyle())
+                    .background(Color.black)
+                }
             }
         }
     }

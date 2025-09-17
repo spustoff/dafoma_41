@@ -9,6 +9,49 @@ import Foundation
 import Combine
 import CoreLocation
 
+// MARK: - Reading Stats
+struct ReadingStats: Codable {
+    var totalArticlesRead: Int = 0
+    var timeSpentReading: TimeInterval = 0
+    var favoriteCategories: [String: Int] = [:]
+    var articlesReadToday: Int = 0
+    var lastReadDate: Date = Date()
+    var weeklyReadingGoal: Int = 50
+    var currentStreak: Int = 0
+    
+    mutating func recordArticleRead(category: NewsCategory) {
+        totalArticlesRead += 1
+        favoriteCategories[category.rawValue, default: 0] += 1
+        
+        // Проверяем, читали ли сегодня
+        if Calendar.current.isDateInToday(lastReadDate) {
+            articlesReadToday += 1
+        } else {
+            articlesReadToday = 1
+            updateStreak()
+        }
+        
+        lastReadDate = Date()
+    }
+    
+    mutating func updateStreak() {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        if Calendar.current.isDate(lastReadDate, inSameDayAs: yesterday) {
+            currentStreak += 1
+        } else {
+            currentStreak = 1
+        }
+    }
+    
+    var weeklyProgress: Double {
+        return min(Double(articlesReadToday) / Double(weeklyReadingGoal), 1.0)
+    }
+    
+    var topCategory: String {
+        return favoriteCategories.max(by: { $0.value < $1.value })?.key ?? "general"
+    }
+}
+
 class NewsFeedViewModel: ObservableObject {
     @Published var articles: [NewsArticle] = []
     @Published var filteredArticles: [NewsArticle] = []
@@ -19,10 +62,16 @@ class NewsFeedViewModel: ObservableObject {
     @Published var showingBookmarksOnly: Bool = false
     @Published var refreshDate: Date = Date()
     
+    // Новые свойства для фич
+    @Published var searchHistory: [String] = []
+    @Published var readingStats = ReadingStats()
+    @Published var autoRefreshEnabled = true
+    
     private let newsService: NewsService
     let locationService: LocationService
-    private let preferencesManager: UserPreferencesManager
+    let preferencesManager: UserPreferencesManager
     private var cancellables = Set<AnyCancellable>()
+    private var autoRefreshTimer: Timer?
     
     init(newsService: NewsService, locationService: LocationService, preferencesManager: UserPreferencesManager) {
         self.newsService = newsService
@@ -31,6 +80,9 @@ class NewsFeedViewModel: ObservableObject {
         
         // Минимальная инициализация
         setupBindings()
+        loadReadingStats()
+        startAutoRefreshTimer()
+        
         // Загружаем данные только при необходимости
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.loadInitialData()
@@ -76,6 +128,10 @@ class NewsFeedViewModel: ObservableObject {
     func markAsRead(_ article: NewsArticle) {
         preferencesManager.markArticleAsRead(article.id)
         updateArticleReadStatus(article.id)
+        
+        // Обновляем статистику
+        readingStats.recordArticleRead(category: article.category)
+        saveReadingStats()
     }
     
     func selectCategory(_ category: NewsCategory?) {
@@ -102,6 +158,79 @@ class NewsFeedViewModel: ObservableObject {
     
     func shareArticle(_ article: NewsArticle) -> String {
         return "\(article.title)\n\n\(article.description)\n\nRead more: \(article.url.absoluteString)"
+    }
+    
+    func addToSearchHistory(_ query: String) {
+        guard !query.isEmpty else { return }
+        
+        // Убираем дубликаты и добавляем в начало
+        searchHistory.removeAll { $0 == query }
+        searchHistory.insert(query, at: 0)
+        
+        // Ограничиваем до 10 запросов
+        if searchHistory.count > 10 {
+            searchHistory = Array(searchHistory.prefix(10))
+        }
+        
+        saveSearchHistory()
+    }
+    
+    func clearSearchHistory() {
+        searchHistory.removeAll()
+        saveSearchHistory()
+    }
+    
+    // MARK: - Auto Refresh
+    func startAutoRefreshTimer() {
+        guard autoRefreshEnabled else { return }
+        
+        autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
+            self?.refreshNews()
+        }
+    }
+    
+    func stopAutoRefreshTimer() {
+        autoRefreshTimer?.invalidate()
+        autoRefreshTimer = nil
+    }
+    
+    // MARK: - Data Persistence
+    private func loadReadingStats() {
+        if let data = UserDefaults.standard.data(forKey: "ReadingStats"),
+           let stats = try? JSONDecoder().decode(ReadingStats.self, from: data) {
+            readingStats = stats
+        }
+    }
+    
+    private func saveReadingStats() {
+        if let data = try? JSONEncoder().encode(readingStats) {
+            UserDefaults.standard.set(data, forKey: "ReadingStats")
+        }
+    }
+    
+    private func saveSearchHistory() {
+        UserDefaults.standard.set(searchHistory, forKey: "SearchHistory")
+    }
+    
+    private func loadSearchHistory() {
+        searchHistory = UserDefaults.standard.stringArray(forKey: "SearchHistory") ?? []
+    }
+    
+    // MARK: - Helper Methods for Views
+    func getReadArticles() -> [NewsArticle] {
+        return articles.filter { preferencesManager.preferences.readArticles.contains($0.id) }
+    }
+    
+    func getBookmarkedArticles() -> [NewsArticle] {
+        return articles.filter { preferencesManager.preferences.bookmarkedArticles.contains($0.id) }
+    }
+    
+    func getLocalArticles() -> [NewsArticle] {
+        return articles.filter { $0.isLocal }
+    }
+    
+    var bookmarkedArticlesCount: Int {
+        return getBookmarkedArticles().count
     }
     
     // MARK: - Private Methods
@@ -178,10 +307,6 @@ class NewsFeedViewModel: ObservableObject {
         filteredArticles.count
     }
     
-    var bookmarkedArticlesCount: Int {
-        articles.filter { preferencesManager.preferences.bookmarkedArticles.contains($0.id) }.count
-    }
-    
     var unreadArticlesCount: Int {
         articles.filter { !preferencesManager.preferences.readArticles.contains($0.id) }.count
     }
@@ -206,42 +331,10 @@ class NewsFeedViewModel: ObservableObject {
     var statusMessage: String {
         if isLoading {
             return "Loading news..."
-        } else if !hasArticles && isSearchActive {
-            return "No articles found for '\(searchText)'"
-        } else if !hasArticles && showingBookmarksOnly {
-            return "No bookmarked articles"
         } else if !hasArticles {
             return "No articles available"
-        } else if selectedCategory != nil {
-            return "\(filteredArticlesCount) \(selectedCategory!.displayName.lowercased()) articles"
-        } else if showingBookmarksOnly {
-            return "\(filteredArticlesCount) bookmarked articles"
         } else {
             return "\(filteredArticlesCount) articles"
         }
-    }
-}
-
-// MARK: - Extensions
-
-extension NewsFeedViewModel {
-    func getArticlesForCategory(_ category: NewsCategory) -> [NewsArticle] {
-        return articles.filter { $0.category == category }
-    }
-    
-    func getRecentArticles(limit: Int = 10) -> [NewsArticle] {
-        return Array(articles.prefix(limit))
-    }
-    
-    func getLocalArticles() -> [NewsArticle] {
-        return articles.filter { $0.isLocal }
-    }
-    
-    func getBookmarkedArticles() -> [NewsArticle] {
-        return articles.filter { preferencesManager.preferences.bookmarkedArticles.contains($0.id) }
-    }
-    
-    func getUnreadArticles() -> [NewsArticle] {
-        return articles.filter { !preferencesManager.preferences.readArticles.contains($0.id) }
     }
 }
