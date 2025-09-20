@@ -326,6 +326,44 @@ struct EnhancedNewsRow: View {
                     .frame(width: 30)
                 
                 VStack(alignment: .leading, spacing: 6) {
+                    // Trending индикаторы
+                    HStack {
+                        if article.isBreaking {
+                            Text("⚡ BREAKING")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.red.opacity(0.2))
+                                .cornerRadius(4)
+                        }
+                        
+                        if article.isHot {
+                            Text("🔥 HOT")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.orange)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.2))
+                                .cornerRadius(4)
+                        }
+                        
+                        if article.isTrending && !article.isHot {
+                            Text("📈 TRENDING")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.2))
+                                .cornerRadius(4)
+                        }
+                        
+                        Spacer()
+                    }
+                    
                     // Заголовок с индикатором прочитанности
                     HStack {
                         Text(article.title)
@@ -340,6 +378,12 @@ struct EnhancedNewsRow: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(.green)
+                        }
+                        
+                        if article.isDownloaded {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
                         }
                     }
                     
@@ -376,7 +420,11 @@ struct EnhancedNewsRow: View {
         .buttonStyle(PlainButtonStyle())
         .listRowBackground(Color.black)
         .sheet(isPresented: $showingDetail) {
-            SimpleArticleDetailView(article: article)
+            if article.isHot || article.isTrending {
+                ReadingModeView(article: article)
+            } else {
+                SimpleArticleDetailView(article: article)
+            }
         }
     }
     

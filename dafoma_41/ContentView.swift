@@ -77,6 +77,13 @@ struct MainAppView: View {
                     Text("News")
                 }
             
+            // Trending Tab
+            TrendingView(newsFeedViewModel: newsFeedViewModel)
+                .tabItem {
+                    Image(systemName: "flame.fill")
+                    Text("Trending")
+                }
+            
             // Bookmarks Tab
             BookmarksView(viewModel: newsFeedViewModel)
                 .tabItem {

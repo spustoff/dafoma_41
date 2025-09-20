@@ -182,3 +182,4 @@ struct StatsCard: View {
 #Preview {
     ReadingStatsView()
 }
+

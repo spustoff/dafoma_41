@@ -23,6 +23,14 @@ struct NewsArticle: Identifiable, Codable, Equatable {
     var isBookmarked: Bool
     var isRead: Bool
     
+    // Новые свойства для trending
+    var trendingScore: Double = 0.0
+    var isHot: Bool = false
+    var isTrending: Bool = false
+    var isBreaking: Bool = false
+    var isDownloaded: Bool = false
+    var downloadedContent: String?
+    
     init(
         id: UUID = UUID(),
         title: String,
@@ -36,7 +44,13 @@ struct NewsArticle: Identifiable, Codable, Equatable {
         category: NewsCategory,
         location: NewsLocation? = nil,
         isBookmarked: Bool = false,
-        isRead: Bool = false
+        isRead: Bool = false,
+        trendingScore: Double = 0.0,
+        isHot: Bool = false,
+        isTrending: Bool = false,
+        isBreaking: Bool = false,
+        isDownloaded: Bool = false,
+        downloadedContent: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -51,6 +65,12 @@ struct NewsArticle: Identifiable, Codable, Equatable {
         self.location = location
         self.isBookmarked = isBookmarked
         self.isRead = isRead
+        self.trendingScore = trendingScore
+        self.isHot = isHot
+        self.isTrending = isTrending
+        self.isBreaking = isBreaking
+        self.isDownloaded = isDownloaded
+        self.downloadedContent = downloadedContent
     }
     
     var timeAgo: String {
@@ -148,7 +168,11 @@ extension NewsArticle {
             url: URL(string: "https://technews.com/ai-healthcare")!,
             imageURL: URL(string: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800"),
             category: .technology,
-            location: NewsLocation(city: "San Francisco", country: "United States", coordinate: NewsLocation.LocationCoordinate(latitude: 37.7749, longitude: -122.4194))
+            location: NewsLocation(city: "San Francisco", country: "United States", coordinate: NewsLocation.LocationCoordinate(latitude: 37.7749, longitude: -122.4194)),
+            trendingScore: 8.5,
+            isHot: true,
+            isTrending: true,
+            isBreaking: false
         ),
         NewsArticle(
             title: "Global Climate Summit Reaches Historic Agreement",
@@ -159,7 +183,11 @@ extension NewsArticle {
             publishedAt: Date().addingTimeInterval(-7200),
             url: URL(string: "https://globalnews.com/climate-summit")!,
             imageURL: URL(string: "https://images.unsplash.com/photo-1569163139394-de4e4f43e4e5?w=800"),
-            category: .general
+            category: .general,
+            trendingScore: 9.2,
+            isHot: true,
+            isTrending: true,
+            isBreaking: true
         ),
         NewsArticle(
             title: "Stock Market Hits Record High Amid Economic Recovery",
@@ -170,7 +198,11 @@ extension NewsArticle {
             publishedAt: Date().addingTimeInterval(-10800),
             url: URL(string: "https://financetimes.com/market-high")!,
             imageURL: URL(string: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800"),
-            category: .business
+            category: .business,
+            trendingScore: 6.8,
+            isHot: false,
+            isTrending: true,
+            isBreaking: false
         ),
         NewsArticle(
             title: "New Study Reveals Benefits of Mediterranean Diet",

@@ -109,3 +109,4 @@ struct SafariView: UIViewControllerRepresentable {
     SimpleArticleDetailView(article: NewsArticle.sampleArticles[0])
 }
 
+
